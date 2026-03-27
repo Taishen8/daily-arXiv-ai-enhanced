@@ -2,7 +2,6 @@ import os
 import json
 import sys
 import re
-import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import List, Dict
 from queue import Queue
@@ -125,44 +124,13 @@ def process_single_item(chain, item: Dict, language: str) -> Dict:
         "conclusion": "Conclusion extraction failed"
     }
     
-    # Retry logic for OpenRouter compatibility
-    max_retries = 2
-    retry_delay = 1  # seconds
-    
-    for attempt in range(max_retries + 1):
-        try:
-            response: Structure = chain.invoke({
-                "language": language,
-                "content": item['summary']
-            })
-            item['AI'] = response.model_dump()
-            break  # Success, exit retry loop
-        except langchain_core.exceptions.OutputParserException as e:
-            # On last attempt, proceed to fallback handling below
-            if attempt == max_retries:
-                raise  # Re-raise to be caught by outer handler
-            
-            # Check if it's a markdown fence issue
-            error_msg = str(e)
-            if "are not valid JSON" in error_msg or "markdown" in error_msg.lower():
-                print(f"Attempt {attempt + 1} failed for {item.get('id', 'unknown')}, retrying...", file=sys.stderr)
-                time.sleep(retry_delay * (attempt + 1))  # Exponential backoff
-                continue
-            else:
-                raise  # Not a fence issue, let outer handler deal with it
-        except Exception as e:
-            # For other errors, also retry
-            if attempt < max_retries:
-                print(f"Attempt {attempt + 1} failed for {item.get('id', 'unknown')}: {e}, retrying...", file=sys.stderr)
-                time.sleep(retry_delay * (attempt + 1))
-                continue
-            raise  # Re-raise after retries exhausted
-    else:
-        # All retries failed, use defaults
-        item['AI'] = default_ai_fields
-        print(f"All retries failed for {item.get('id', 'unknown')}, using defaults", file=sys.stderr)
-        
-except langchain_core.exceptions.OutputParserException as e:
+    try:
+        response: Structure = chain.invoke({
+            "language": language,
+            "content": item['summary']
+        })
+        item['AI'] = response.model_dump()
+    except langchain_core.exceptions.OutputParserException as e:
         # 尝试从错误信息中提取 JSON 字符串并修复
         error_msg = str(e)
         partial_data = {}
@@ -171,17 +139,6 @@ except langchain_core.exceptions.OutputParserException as e:
             try:
                 # 提取 JSON 字符串
                 json_str = error_msg.split("Function Structure arguments:", 1)[1].strip().split('are not valid JSON')[0].strip()
-                
-                # Strip markdown code fences if present (OpenRouter sometimes wraps JSON in fences)
-                json_str = json_str.strip()
-                if json_str.startswith('```json'):
-                    json_str = json_str[7:]
-                elif json_str.startswith('```'):
-                    json_str = json_str[3:]
-                if json_str.endswith('```'):
-                    json_str = json_str[:-3]
-                json_str = json_str.strip()
-                
                 # 预处理 LaTeX 数学符号 - 使用四个反斜杠来确保正确转义
                 json_str = json_str.replace('\\', '\\\\')
                 # 尝试解析修复后的 JSON
@@ -279,13 +236,6 @@ def main():
             unique_data.append(item)
 
     data = unique_data
-    
-    # Apply MAX_PAPERS_PER_RUN cap (post-dedupe)
-    max_papers = int(os.environ.get("MAX_PAPERS_PER_RUN", "20"))
-    if len(data) > max_papers:
-        print(f'Capping to {max_papers} papers (from {len(data)})', file=sys.stderr)
-        data = data[:max_papers]
-    
     print('Open:', args.data, file=sys.stderr)
     
     # 并行处理所有数据

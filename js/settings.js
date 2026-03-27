@@ -19,20 +19,7 @@ function loadKeywordPreferences() {
   
   // 获取保存的关键词，如果没有则使用默认关键词
   let savedKeywords = localStorage.getItem('preferredKeywords');
-  // Default AI4S keywords (English + Chinese) for new users
-  const defaultKeywords = [
-    // English
-    "graph neural network", "GNN", "equivariant", "diffusion", 
-    "molecular property", "materials design", "protein", "protein design",
-    "reaction", "catalysis", "climate", "turbulence", 
-    "RLVR", "RAG", "benchmark",
-    // Chinese
-    "图神经网络", "等变", "扩散模型", "分子性质", 
-    "材料设计", "蛋白", "反应路径", "催化", 
-    "气候", "湍流", "检索增强", "基准"
-  ];
-  
-  let keywords = defaultKeywords; // 默认AI4S关键词
+  let keywords = []; // 默认无关键词
   
   if (savedKeywords) {
     try {
