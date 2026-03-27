@@ -139,6 +139,17 @@ def process_single_item(chain, item: Dict, language: str) -> Dict:
             try:
                 # 提取 JSON 字符串
                 json_str = error_msg.split("Function Structure arguments:", 1)[1].strip().split('are not valid JSON')[0].strip()
+                
+                # Strip markdown code fences if present (OpenRouter sometimes wraps JSON in fences)
+                json_str = json_str.strip()
+                if json_str.startswith('```json'):
+                    json_str = json_str[7:]
+                elif json_str.startswith('```'):
+                    json_str = json_str[3:]
+                if json_str.endswith('```'):
+                    json_str = json_str[:-3]
+                json_str = json_str.strip()
+                
                 # 预处理 LaTeX 数学符号 - 使用四个反斜杠来确保正确转义
                 json_str = json_str.replace('\\', '\\\\')
                 # 尝试解析修复后的 JSON
@@ -236,6 +247,13 @@ def main():
             unique_data.append(item)
 
     data = unique_data
+    
+    # Apply MAX_PAPERS_PER_RUN cap (post-dedupe)
+    max_papers = int(os.environ.get("MAX_PAPERS_PER_RUN", "20"))
+    if len(data) > max_papers:
+        print(f'Capping to {max_papers} papers (from {len(data)})', file=sys.stderr)
+        data = data[:max_papers]
+    
     print('Open:', args.data, file=sys.stderr)
     
     # 并行处理所有数据
