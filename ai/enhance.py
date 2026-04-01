@@ -125,11 +125,13 @@ def process_single_item(chain, item: Dict, language: str) -> Dict:
     }
     
     try:
+        print(f"Processing paper {item.get('id', 'unknown')}...", file=sys.stderr)
         response: Structure = chain.invoke({
             "language": language,
             "content": item['summary']
         })
         item['AI'] = response.model_dump()
+        print(f"Successfully processed {item.get('id', 'unknown')}", file=sys.stderr)
     except langchain_core.exceptions.OutputParserException as e:
         # 尝试从错误信息中提取 JSON 字符串并修复
         error_msg = str(e)
@@ -178,15 +180,28 @@ def process_single_item(chain, item: Dict, language: str) -> Dict:
 
 def process_all_items(data: List[Dict], model_name: str, language: str, max_workers: int) -> List[Dict]:
     """并行处理所有数据项"""
-    llm = ChatOpenAI(model=model_name).with_structured_output(Structure, method="function_calling")
-    print('Connect to:', model_name, file=sys.stderr)
+    # Initialize LLM with OpenRouter-compatible settings
+    llm = ChatOpenAI(
+        model=model_name,
+        temperature=0.7,
+        max_tokens=2000
+    )
+    
+    # Try structured output with JSON mode (more compatible with OpenRouter)
+    try:
+        structured_llm = llm.with_structured_output(Structure, method="json_mode")
+        print(f'Using json_mode for structured output with {model_name}', file=sys.stderr)
+    except Exception as e:
+        print(f'json_mode failed, trying function_calling: {e}', file=sys.stderr)
+        structured_llm = llm.with_structured_output(Structure, method="function_calling")
+        print(f'Using function_calling for structured output with {model_name}', file=sys.stderr)
     
     prompt_template = ChatPromptTemplate.from_messages([
         SystemMessagePromptTemplate.from_template(system),
         HumanMessagePromptTemplate.from_template(template=template)
     ])
 
-    chain = prompt_template | llm
+    chain = prompt_template | structured_llm
     
     # 使用线程池并行处理
     processed_data = [None] * len(data)  # 预分配结果列表
