@@ -164,7 +164,17 @@ def process_single_item(chain, item: Dict, language: str) -> Dict:
         print(f"Using partial AI data for {item.get('id', 'unknown')}: {list(partial_data.keys())}", file=sys.stderr)
     except Exception as e:
         # Catch any other exceptions and provide default values
-        print(f"Unexpected error for {item.get('id', 'unknown')}: {e}", file=sys.stderr)
+        import traceback
+        error_msg = str(e)
+        print(f"ERROR for {item.get('id', 'unknown')}: {error_msg}", file=sys.stderr)
+        if 'authentication' in error_msg.lower() or '401' in error_msg or '403' in error_msg:
+            print(f"  -> Authentication error - check API key", file=sys.stderr)
+        elif 'rate limit' in error_msg.lower() or '429' in error_msg:
+            print(f"  -> Rate limit error - slow down requests", file=sys.stderr)
+        elif 'connection' in error_msg.lower():
+            print(f"  -> Connection error - network or API unavailable", file=sys.stderr)
+        else:
+            print(f"  -> {traceback.format_exc()}", file=sys.stderr)
         item['AI'] = default_ai_fields
     
     # Final validation to ensure all required fields exist
@@ -181,6 +191,8 @@ def process_single_item(chain, item: Dict, language: str) -> Dict:
 def process_all_items(data: List[Dict], model_name: str, language: str, max_workers: int) -> List[Dict]:
     """并行处理所有数据项"""
     # Initialize LLM with OpenRouter-compatible settings
+    print(f"Initializing LLM with model: {model_name}", file=sys.stderr)
+    print(f"API Base URL: {os.environ.get('OPENAI_BASE_URL', 'default')}", file=sys.stderr)
     llm = ChatOpenAI(
         model=model_name,
         temperature=0.7,
