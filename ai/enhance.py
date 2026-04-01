@@ -190,7 +190,14 @@ def process_single_item(chain, item: Dict, language: str) -> Dict:
     # 检查 AI 生成的所有字段
     for v in item.get("AI", {}).values():
         if is_sensitive(str(v)):
+            print(f"FILTERED: Paper {item.get('id', 'unknown')} contains sensitive content in AI output", file=sys.stderr)
             return None
+    
+    # Also check original summary
+    if is_sensitive(item.get("summary", "")):
+        print(f"FILTERED: Paper {item.get('id', 'unknown')} contains sensitive content in original summary", file=sys.stderr)
+        return None
+    
     return item
 
 def process_all_items(data: List[Dict], model_name: str, language: str, max_workers: int) -> List[Dict]:
