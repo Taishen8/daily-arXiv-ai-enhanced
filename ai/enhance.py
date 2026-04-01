@@ -196,7 +196,9 @@ def process_all_items(data: List[Dict], model_name: str, language: str, max_work
     llm = ChatOpenAI(
         model=model_name,
         temperature=0.7,
-        max_tokens=2000
+        max_tokens=2000,
+        timeout=60,  # 60 second timeout for API calls
+        max_retries=2  # Retry failed requests up to 2 times
     )
     
     # Try structured output with JSON mode (more compatible with OpenRouter)
