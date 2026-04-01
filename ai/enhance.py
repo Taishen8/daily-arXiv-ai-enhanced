@@ -137,6 +137,9 @@ def process_single_item(chain, item: Dict, language: str) -> Dict:
         error_msg = str(e)
         partial_data = {}
         
+        # Debug: Log the actual error message
+        print(f"DEBUG OutputParserException for {item.get('id', 'unknown')}: {error_msg[:200]}...", file=sys.stderr)
+        
         if "Function Structure arguments:" in error_msg:
             try:
                 # 提取 JSON 字符串
@@ -160,6 +163,8 @@ def process_single_item(chain, item: Dict, language: str) -> Dict:
                 print(f"Failed to parse JSON for {item.get('id', 'unknown')}: {json_e}", file=sys.stderr)
         
         # Merge partial data with defaults to ensure all fields exist
+        if not partial_data:
+            print(f"DEBUG: No partial data extracted for {item.get('id', 'unknown')}", file=sys.stderr)
         item['AI'] = {**default_ai_fields, **partial_data}
         print(f"Using partial AI data for {item.get('id', 'unknown')}: {list(partial_data.keys())}", file=sys.stderr)
     except Exception as e:
